@@ -1,4 +1,4 @@
-open ttyUSB0
+open tty.usbmodem143302
 put boot.py
 put config.py
 put main.py

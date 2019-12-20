@@ -44,6 +44,7 @@ def main():
     # TO-DO: add concept of Open and closed sensor pins and use their changing state and timing to determine open/closing,
     # as well as using timing and Open/Close commands received while opening to determine Stopped state
     # Ensure manual triggers of opening via push button are configured.
+    print("Initialising hardware pins")
     open_switch_pin = machine.Pin(OPEN_SENSOR_PIN, machine.Pin.IN, machine.Pin.PULL_UP)
     open_reed_switch = Switch(open_switch_pin)
     closed_switch_pin = machine.Pin(CLOSED_SENSOR_PIN, machine.Pin.IN, machine.Pin.PULL_UP)
@@ -52,6 +53,12 @@ def main():
     push_button = Switch(push_button_pin)
 
     # Initialize state of garage door after booting up
+    print("Initialising MQTT state")
+    # TO-DO: PIN logic appears to be inverted 1 is open switch 0 is closed switch - ADDRESS THIS!!!
+    # print("open_switch_pin.value() : " + str(open_switch_pin.value()))
+    # print("closed_switch_pin.value() : " + str(closed_switch_pin.value()))
+    # print("open_reed_switch.value : " + str(open_reed_switch.value))
+    # print("closed_reed_switch.value : " + str(open_reed_switch.value))
     if not open_switch_pin.value():
         client.publish(STATE_TOPIC, "Open", retain=True)
     elif not closed_switch_pin.value():
@@ -115,10 +122,14 @@ def main():
                         client.publish(STATE_TOPIC, "Stopped")
                     toggleRelay()
 
-            # TO-DO: Add derived 'Opening' and  'Closing' states to logic
-                # else:
-                #     client.publish(STATE_TOPIC, "closed")
-
+                    # TO-DO: Add logic to DoorState class to track whichn direction the door will head on repeated intermediary toggles withing a single transition window (closing/opening etc) Note will never cope with use of remote control until reaching an extremity.  ideas:
+                    #  DoorState.CLOSING
+                    #  DoorState.OPENING
+                    #  DoorState.STOPPED
+                    #  DoorState.CLOSED
+                    #  DoorState.OPEN
+                    # TO-DO: Add logic to opener requests to give operations context for current sensor state (eg cancelling open or close operations - lots of scenarios to think through)
+                    
             # Process any MQTT messages
             if client.check_msg():
                 client.wait_msg()

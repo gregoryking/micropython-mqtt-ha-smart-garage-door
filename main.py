@@ -1,5 +1,6 @@
 from umqtt.simple import MQTTClient
 from switch import Switch
+from doorstate import DoorState
 import machine
 import ubinascii
 import time
@@ -53,6 +54,7 @@ def main():
         client.publish(STATE_TOPIC, "Closed", retain=True)
     else:
         client.publish(STATE_TOPIC, "Stopped", retain=True) # Assumes the door isn't in the process of opening or closing on power-up
+    door_state = DoorState(open_reed_switch, closed_reed_switch, client)
 
     relay_pin = machine.Pin(RELAY_PIN, machine.Pin.OUT, 0)
 
@@ -77,14 +79,21 @@ def main():
             # If the reed switches have a new value, publish the new state
             if open_reed_switch_new_value:
                 if open_reed_switch_value:
+                    door_state.end_door_transition()
+                    print("Publishing Open message")
+                    client.publish(STATE_TOPIC, "Open")
+                else:
+                    door_state.start_door_transition()
                     print("Publishing Closing message")
                     client.publish(TARGET_TOPIC, "Closed")
                     client.publish(STATE_TOPIC, "Closing")
-                else:
-                    print("Publishing Open message")
-                    client.publish(STATE_TOPIC, "Open")
             if closed_reed_switch_new_value:
                 if closed_reed_switch_value:
+                    door_state.end_door_transition()
+                    print("Publishing Closed message")
+                    client.publish(STATE_TOPIC, "Closed")
+                else:
+                    door_state.start_door_transition()
                     print("Publishing Opening message")
                     client.publish(TARGET_TOPIC, "Open")
                     client.publish(STATE_TOPIC, "Opening")

@@ -12,14 +12,16 @@ CLIENT_ID = ubinascii.hexlify(machine.unique_id())
 relay_pin = None
 
 
-def new_msg(topic, msg):
-    print("Received {} on {} topic".format(msg, topic))
+def toggleRelay():
     print("Turning relay on")
     relay_pin.value(1)
     time.sleep_ms(600)
     print("Turning relay off")
     relay_pin.value(0)
 
+def new_msg(topic, msg):
+    print("Received {} on {} topic".format(msg, topic))
+    toggleRelay()
 
 def main():
     global relay_pin

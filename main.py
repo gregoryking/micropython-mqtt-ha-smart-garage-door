@@ -48,6 +48,8 @@ def main():
     open_reed_switch = Switch(open_switch_pin)
     closed_switch_pin = machine.Pin(CLOSED_SENSOR_PIN, machine.Pin.IN, machine.Pin.PULL_UP)
     closed_reed_switch = Switch(closed_switch_pin)
+    push_button_pin = machine.Pin(PUSH_BUTTON_PIN, machine.Pin.IN, machine.Pin.PULL_UP)
+    push_button = Switch(push_button_pin)
 
     # Initialize state of garage door after booting up
     if not open_switch_pin.value():
@@ -65,6 +67,7 @@ def main():
 
             open_reed_switch_new_value = False
             closed_reed_switch_new_value = False
+            push_button_new_value = False
 
             # Disable interrupts for a short time to read shared variable
             irq_state = machine.disable_irq()
@@ -76,6 +79,10 @@ def main():
                 closed_reed_switch_value = not closed_reed_switch.value
                 closed_reed_switch_new_value = True
                 closed_reed_switch.new_value_available = False
+            if push_button.new_value_available:
+                push_button_value = not push_button.value
+                push_button_new_value = True
+                push_button.new_value_available = False
             machine.enable_irq(irq_state)
 
             # If the reed switches have a new value, publish the new state
@@ -99,6 +106,14 @@ def main():
                     print("Publishing Opening message")
                     client.publish(TARGET_TOPIC, "Open")
                     client.publish(STATE_TOPIC, "Opening")
+            if push_button_new_value:
+                if push_button_value:
+                    print("Push button depressed")
+                else:
+                    print("Push button RELEASED... triggering door action")
+                    if door_state.moving:
+                        client.publish(STATE_TOPIC, "Stopped")
+                    toggleRelay()
 
             # TO-DO: Add derived 'Opening' and  'Closing' states to logic
                 # else:

@@ -50,9 +50,9 @@ def main():
     closed_reed_switch = Switch(closed_switch_pin)
 
     # Initialize state of garage door after booting up
-    if open_switch_pin.value():
+    if not open_switch_pin.value():
         client.publish(STATE_TOPIC, "Open", retain=True)
-    elif closed_switch_pin.value():
+    elif not closed_switch_pin.value():
         client.publish(STATE_TOPIC, "Closed", retain=True)
     else:
         client.publish(STATE_TOPIC, "Stopped", retain=True) # Assumes the door isn't in the process of opening or closing on power-up
@@ -69,11 +69,11 @@ def main():
             # Disable interrupts for a short time to read shared variable
             irq_state = machine.disable_irq()
             if open_reed_switch.new_value_available:
-                open_reed_switch_value = open_reed_switch.value
+                open_reed_switch_value = not open_reed_switch.value
                 open_reed_switch_new_value = True
                 open_reed_switch.new_value_available = False
             if closed_reed_switch.new_value_available:
-                closed_reed_switch_value = closed_reed_switch.value
+                closed_reed_switch_value = not closed_reed_switch.value
                 closed_reed_switch_new_value = True
                 closed_reed_switch.new_value_available = False
             machine.enable_irq(irq_state)
@@ -99,9 +99,6 @@ def main():
                     print("Publishing Opening message")
                     client.publish(TARGET_TOPIC, "Open")
                     client.publish(STATE_TOPIC, "Opening")
-                else:
-                    print("Publishing Closed message")
-                    client.publish(STATE_TOPIC, "Closed")
 
             # TO-DO: Add derived 'Opening' and  'Closing' states to logic
                 # else:

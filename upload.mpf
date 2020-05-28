@@ -1,6 +1,8 @@
-open tty.usbmodem143302
+open tty.usbmodem143402
 put boot.py
 put config.py
 put main.py
 put switch.py
+put doorstate.py
+put doorcontroller.py
 ls

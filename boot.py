@@ -5,7 +5,6 @@ import uos, machine
 import gc
 import network
 from config import ESSID, PASSWORD
-
 gc.collect()
 
 print("Starting...")

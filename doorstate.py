@@ -1,38 +1,117 @@
 import machine
-from config import TRANSITION_DURATION, STATE_TOPIC
+from switch import Switch
+from config import TRANSITION_DURATION, STATE_TOPIC, TARGET_TOPIC, OPEN_SENSOR_PIN, CLOSED_SENSOR_PIN
 
-class DoorState(): # pylint: disable=too-few-public-methods
+class DoorState:  # pylint: disable=too-few-public-methods
     """DoorState Class
 
     Class for tracking and reporting the state of a door.
     Uses a timer to infer the door has stopped if it hasn't reach an open/closed
     state within TRANSITION_DURATION
     """
-    STOPPED, OPEN, OPENING, CLOSED, CLOSING = 0, 1, 2, 3, 4
+    STOPPED, OPEN, OPENING, CLOSED, CLOSING, UNKNOWN = 0, 1, 2, 3, 4, 5
+    STATUS, TARGET_STATE = 6, 7
+    mqttState = ["Stopped", "Open", "Opening", "Closed", "Closing", "Unknown"]
 
-    def __init__(self, open_reed_switch, closed_reed_switch, client):
+    def __init__(self, client):
         self.__door_status_timer = machine.Timer(-1)
-        self.__open_reed_switch = open_reed_switch
-        self.__closed_reed_switch = closed_reed_switch
+        self.__open_reed_switch = Switch(OPEN_SENSOR_PIN, True)
+        self.__closed_reed_switch = Switch(CLOSED_SENSOR_PIN, True)
         self.__client = client
-        self.moving = False
+        self.__status = self.UNKNOWN
+        self.__target_state = self.UNKNOWN
+        self.__first_state()
 
-    def start_door_transition(self):
-        self.moving = True
-        self.__door_status_timer.init(period=TRANSITION_DURATION, mode=machine.Timer.ONE_SHOT,
-                                    callback=self._door_transition_check)
+    @property
+    def status(self):
+        return self.__status
 
-    def end_door_transition(self):
-        self.moving = False
-        # TO-DO: Check that deinit'ing a timer that hasn't been initialised won't error.
-        self.__door_status_timer.deinit()
+    @property
+    def target_state(self):
+        return self.__target_state
+
+    def isMoving(self):
+        if self.status in [self.OPENING, self.CLOSING]:
+            return True
+        else:
+            return False
+
+    def toggle_target_state(self):
+        if self.__target_state == self.OPEN:
+            self.__target_state = self.CLOSED
+        elif self.__target_state == self.CLOSED:
+            self.__target_state = self.OPEN
 
     def _door_transition_check(self, _):
         # Disable interrupts for a short time to read shared variable
         irq_state = machine.disable_irq()
-        open_reed_switch_value = not self.__open_reed_switch.value
-        closed_reed_switch_value = not self.__closed_reed_switch.value
+        open_reed_switch_value = self.__open_reed_switch.value
+        closed_reed_switch_value = self.__closed_reed_switch.value
         machine.enable_irq(irq_state)
 
-        if (not open_reed_switch_value and not closed_reed_switch_value):
-            self.__client.publish(STATE_TOPIC, "Stopped")
+        # Check if the door has made no progress to an OPEN or CLOSED state and update/publish STOPPED status if so
+        if not (open_reed_switch_value or closed_reed_switch_value):
+            self.__status = self.STOPPED
+            print("Door Stopped")
+        
+        self.__client.publish(STATE_TOPIC, self.mqttState[self.__status])
+
+    def __first_state(self):
+        # Disable interrupts for a short time to read shared variable
+        irq_state = machine.disable_irq()
+        open_reed_switch_value = self.__open_reed_switch.value
+        closed_reed_switch_value = self.__closed_reed_switch.value
+        machine.enable_irq(irq_state)
+
+        if open_reed_switch_value:
+            self.__status = self.OPEN
+            self.__client.publish(STATE_TOPIC, self.mqttState[self.__status], retain=True)
+        elif closed_reed_switch_value:
+            self.__status = self.CLOSED
+            self.__client.publish(STATE_TOPIC, self.mqttState[self.__status], retain=True)
+        else:
+            self.__status = self.STOPPED
+            self.__client.publish(STATE_TOPIC, self.mqttState[self.__status], retain=True)
+
+    def update(self):
+        # Disable interrupts for a short time to read shared variable
+        irq_state = machine.disable_irq()
+        open_reed_switch_new_value = self.__open_reed_switch.new_value
+        closed_reed_switch_new_value = self.__closed_reed_switch.new_value
+        machine.enable_irq(irq_state)
+
+        old_status = self.__status
+        old_target_state = self.__target_state
+
+        # If the reed switches have a new value, update the new state
+        if open_reed_switch_new_value is not None:
+            if open_reed_switch_new_value:
+                self.__status = self.OPEN
+                print("Door Open")
+            else:
+                self.__status = self.CLOSING
+                self.__target_state = self.CLOSED
+                print("Door closing...")
+        if closed_reed_switch_new_value is not None:
+            if closed_reed_switch_new_value:
+                self.__status = self.CLOSED
+                print("Door Closed")                    
+            else:
+                self.__status = self.OPENING
+                self.__target_state = self.OPEN
+                print("Door opening...")
+        
+        # Publish changes in status
+        if old_status != self.__status:
+            self.__client.publish(STATE_TOPIC, self.mqttState[self.__status])
+            # Also start a timer to detect a door that has failed to open/close before TRANSITION_DURATION elapses
+            # TO-DO: Timer will need to be cancelled when other processes like the push button intefere with the
+            # derived stop state generated by _door_transition_check
+            if self.__status in [self.OPENING, self.CLOSING]:
+                self.__door_status_timer.init(period=TRANSITION_DURATION, mode=machine.Timer.ONE_SHOT,
+                                              callback=self._door_transition_check)
+        if old_target_state != self.__target_state:
+            self.__client.publish(TARGET_TOPIC, self.mqttState[self.__target_state])
+
+# # TO-DO: Check that deinit'ing a timer that hasn't been initialised won't error.
+# self.__door_status_timer.deinit()

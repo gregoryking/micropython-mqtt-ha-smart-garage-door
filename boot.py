@@ -24,4 +24,4 @@ def connect():
     print('Disabling access-point interface')
     ap_if.active(False)
 
-connect()
+# connect()

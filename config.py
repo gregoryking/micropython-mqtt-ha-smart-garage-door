@@ -1,6 +1,4 @@
-# Wireless Credentials
-ESSID = ***REMOVED***
-PASSWORD = ***REMOVED***
+import creds
 
 # MQTT
 # SERVER = "mqttserver"
@@ -19,7 +17,7 @@ TRANSITION_DURATION = 15000
 #                                                         VDD   RX   TX
 
 RELAY_PIN=12 # Need to test this works as a relap pin (12 worked previously 12?)
-OPEN_SENSOR_PIN=4
+l=4
 # CLOSED_SENSOR_PIN=3  # Would ideally free up this sensor pin to allow serial debugging and updates
 CLOSED_SENSOR_PIN=5 #Use 3 here once debugging complete, 0 for interim tresting. set to unusable 5 while using 0 for other testing?
 PUSH_BUTTON_PIN=0 # 5 doesn't work as pushbutton?

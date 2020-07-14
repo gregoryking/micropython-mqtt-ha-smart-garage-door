@@ -1,6 +1,6 @@
 # Wireless Credentials
-ESSID = ***REMOVED***
-PASSWORD = ***REMOVED***
+# ESSID = ***REMOVED***
+# PASSWORD = ***REMOVED***
 
 # MQTT
 # SERVER = "mqttserver"
@@ -11,7 +11,7 @@ TARGET_TOPIC = "home/garage/garagedoortarget"
 AVAILABILITY_TOPIC = "home/garage/garagedoor/available"
 
 # Full time taken for door to move from open to closed or vice versa (ms)
-TRANSITION_DURATION = 15000
+TRANSITION_DURATION = 10000
 
 # Hardware Pin scheme
 # +12v  GPIO  GND   GPIO              GPIO  GPIO  +3.3v +3.3v GPIO  GPIO

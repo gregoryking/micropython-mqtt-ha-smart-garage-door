@@ -8,10 +8,6 @@ import uasyncio as asyncio
 unit_test_transition_duration = 100
 unit_test_refresh_ms = 10
 
-# actuator = DoorActuator(transition_duration=unit_test_transition_duration, refresh_ms=unit_test_refresh_ms)
-# actuator = DoorActuator()
-
-# def loop_setup():
 
 async def run_and_wait(loop, coro, wait=None):
     task = loop.create_task(coro)
@@ -20,14 +16,16 @@ async def run_and_wait(loop, coro, wait=None):
     else:
         await asyncio.sleep_ms(wait)
 
+
 async def run_and_wait_seq(loop, coro, seq):
     for i in seq:
         # Adjust timings for sped up unittests
         delay = i
         if i is not None:
             delay = int(delay * (unit_test_transition_duration / DoorActuator.default_transition_time_total))
-        print("test is goign to wait ", str(delay))
+        # print("test is goign to wait ", str(delay))
         await run_and_wait(loop, coro(), delay)
+
 
 def setup_and_run(seq):
     # actuator = DoorActuator()
@@ -40,6 +38,7 @@ def setup_and_run(seq):
     asyncio.new_event_loop()
     return  actuator.position
 
+
 # TO-DO, make the 2000 times relative to test configuration parameters
 class DoorActuatorRunRequests(unittest.TestCase):
     """Tests for stubbing."""
@@ -50,6 +49,14 @@ class DoorActuatorRunRequests(unittest.TestCase):
 
     def test_triple_click(self):
         position = setup_and_run([0, 0, None])
+        self.assertTrue(position == DoorActuator.OPEN)
+
+    def test_triple_click_double_click_stop_close(self):
+        position = setup_and_run([0, 0, 2000,0,2000, None])
+        self.assertTrue(position == DoorActuator.CLOSED)
+
+    def test_go_nuts(self):
+        position = setup_and_run([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, None])
         self.assertTrue(position == DoorActuator.OPEN)
 
     def test_double_click_pause_click(self):
@@ -83,6 +90,7 @@ class DoorActuatorRunRequests(unittest.TestCase):
     def test_open_stop_close_stop_open(self):
         position = setup_and_run([4000, 2000, 2000, 3000, None])
         self.assertTrue(position == DoorActuator.OPEN)
+
 
 if __name__ == '__main__':
     unittest.main()

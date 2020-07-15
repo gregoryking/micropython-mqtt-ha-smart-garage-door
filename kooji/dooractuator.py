@@ -39,9 +39,9 @@ class DoorActuator:
         self.__transition_time_until_open = transition_duration
         self.__time_last_run_request = None
         self.__running_task = None
-        self.__stateChangeCallback = state_change_callback
+        self.__stateChangeCallback = state_change_callback # unused at present
 
-        if (self.__transition_time_total % self.__refresh_ms != 0):
+        if self.__transition_time_total % self.__refresh_ms != 0:
             raise ValueError("refresh_ms must be a factor of transition_duration")
 
     def door_position(self):
@@ -53,9 +53,8 @@ class DoorActuator:
             status = DoorActuator.movement_labels[self.movement]
         return "{} ({:.0%})".format(status, percentage_closed)
 
-    def print_status(self):
-        log.debug(str(self.proportion_closed) + '\t' + self.door_position())
-        # log.debug(self.door_position())
+    def print_status(self, level=logging.DEBUG):
+        log.log(level, "\tstatus\t%s", self.door_position())
 
     @property
     def position(self):
@@ -84,7 +83,6 @@ class DoorActuator:
     def __set_movement(self, state):
         self.__movement = state
         self.print_status()
-        # self.__stateChangeCallback({"state": state, "__proportion_closed": self.__proportion_closed})
 
     # @state.setter
     # def state(self, state):
@@ -93,52 +91,41 @@ class DoorActuator:
 
     #
     async def move(self):
-        log.debug('** move call')
+        log.info("\tmove\tStarting door movement")
+        self.print_status(logging.INFO)
         while True:
-            # log.debug('**move iteration pre-debounce**')
             await asyncio.sleep_ms(self.__refresh_ms)
-            # log.debug('**move iteration post-debounce**')
             self.__transition_time_until_open -= (self.__movement * self.__refresh_ms)
-            if self.__transition_time_until_open % self.__transition_time_total == 0:
-                if self.__transition_time_until_open == 0:
-                    self.__position = DoorActuator.OPEN
-                    self.__next_movement = DoorActuator.CLOSED
-                if self.__transition_time_until_open == self.__transition_time_total:
-                    self.__position = DoorActuator.CLOSED
-                    self.__next_movement = DoorActuator.OPENING
+            self.update_position()
+            if self.__position != DoorActuator.PART_OPEN:
+                log.info("\tmove\tEnding door movement")
+                self.print_status(logging.INFO)
                 break
-            else:
-                self.__position = DoorActuator.PART_OPEN
             self.print_status()
 
-    async def __run(self):
-        log.debug("*** __run Call: %s", DoorActuator.position_labels[self.position])
-
-        # await asyncio.sleep_ms(self.__refresh_ms + 50)  # debounce run requests < Refresh rate
-        if self.__movement == DoorActuator.OPENING or self.__movement == DoorActuator.CLOSING:
-            self.__set_movement(DoorActuator.STOPPED)
-        elif self.__movement == DoorActuator.STOPPED:
-            if self.__next_movement == DoorActuator.OPENING:
-                self.__next_movement = DoorActuator.CLOSING
-                self.__set_movement(DoorActuator.OPENING)
-            elif self.__next_movement == DoorActuator.CLOSING:
+    def update_position(self):
+        if self.__transition_time_until_open % self.__transition_time_total == 0:
+            if self.__transition_time_until_open == 0:
+                self.__position = DoorActuator.OPEN
+                self.__next_movement = DoorActuator.CLOSED
+            if self.__transition_time_until_open == self.__transition_time_total:
+                self.__position = DoorActuator.CLOSED
                 self.__next_movement = DoorActuator.OPENING
-                self.__set_movement(DoorActuator.CLOSING)
-            await self.move()
-        self.__set_movement(DoorActuator.STOPPED)
-        self.__running_task = None
+        else:
+            self.__position = DoorActuator.PART_OPEN
 
     async def run(self):
-        log.debug("*** run Call: %s", DoorActuator.position_labels[self.position])
-        log.debug("raw ticks diff is %d", time.ticks_diff(time.ticks_ms(), self.__time_last_run_request))
+        log.info("\trun\tProcessing run request from [%s] position and [%s] movement state",
+                  DoorActuator.position_labels[self.position],
+                  DoorActuator.movement_labels[self.movement])
 
         # Debounce requests
         lrr = self.__time_last_run_request
         self.__time_last_run_request = time.ticks_ms()
-        print("************************* " + str(lrr) + " " + str(self.__time_last_run_request))
-
         if time.ticks_diff(time.ticks_ms(), lrr) < self.__refresh_ms: # Debounce repeated requests
-            log.debug("*** run Debounced a request: %s", DoorActuator.position_labels[self.position])
+            log.info("\trun\tDebounced run request from [%s] position and [%s] movement state",
+                      DoorActuator.position_labels[self.position],
+                      DoorActuator.movement_labels[self.movement])
             self.__time_last_run_request = time.ticks_ms()
             if self.__running_task:
                 return await self.__running_task
@@ -146,13 +133,18 @@ class DoorActuator:
                 return
 
         # If no task is currently running, schedule one immediately
-        log.debug("***running_task: %s", str(self.__running_task))
         if self.__running_task is None:
-            self.__running_task = asyncio.create_task(self.__run())
-            return await self.__running_task
+            log.info("\trun\t%s", "Scheduling a new move task")
+            self.__set_movement(self.__next_movement)
+            self.__next_movement *= -1
+            self.__running_task = asyncio.create_task(self.move())
+            await self.__running_task
+            self.__set_movement(DoorActuator.STOPPED)
+            self.__running_task = None
+
         # Else treat a run request as a cancellation
         else:
-            log.debug("*** run Cancelling task: %s", DoorActuator.position_labels[self.position])
+            log.info("\trun\t Cancelling [%s] operation", DoorActuator.movement_labels[self.movement])
             self.__running_task.cancel()
             self.__running_task = None
             self.__set_movement(DoorActuator.STOPPED)
@@ -165,29 +157,3 @@ class DoorActuator:
 #         sys.exit()
 #     loop = asyncio.get_event_loop()
 #     loop.set_exception_handler(handle_exception)
-#
-#
-# async def main():
-#     set_global_exception()  # Debug aid
-#     myMotor = Motor(lambda x: print('State is ' + str(x)))
-#     myMotor2 = Motor(lambda x: print('State2 is ' + str(x)))
-#     # asyncio.run(doSomePrinting())
-#     # asyncio.create_task(doSomePrinting())
-#     # asyncio.create_task(myMotor.run())
-#     # asyncio.create_task(myMotor.run())
-#     myMotor.run()
-#     await asyncio.sleep_ms(11000)
-#     myMotor.run()
-#     await asyncio.sleep_ms(3000)
-#     myMotor.run()
-#     await asyncio.sleep_ms(4000)
-#     myMotor.run()
-#     await asyncio.sleep_ms(4000)
-#     myMotor.run()
-#     await asyncio.sleep_ms(11000)
-#     myMotor.run()
-#     await asyncio.sleep_ms(100)
-#     myMotor.run()
-#     await asyncio.sleep_ms(100)
-#     myMotor.run()
-#     await asyncio.sleep_ms(100000)

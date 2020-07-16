@@ -82,7 +82,7 @@ class DoorActuator:
 
     def __set_movement(self, state):
         self.__movement = state
-        self.print_status()
+        # self.print_status()
 
     # @state.setter
     # def state(self, state):
@@ -98,10 +98,10 @@ class DoorActuator:
             self.__transition_time_until_open -= (self.__movement * self.__refresh_ms)
             self.update_position()
             if self.__position != DoorActuator.PART_OPEN:
+                self.__movement = DoorActuator.STOPPED
                 log.info("\tmove\tEnding door movement")
                 self.print_status(logging.INFO)
                 break
-            self.print_status()
 
     def update_position(self):
         if self.__transition_time_until_open % self.__transition_time_total == 0:
@@ -148,6 +148,8 @@ class DoorActuator:
             self.__running_task.cancel()
             self.__running_task = None
             self.__set_movement(DoorActuator.STOPPED)
+            self.print_status()
+
 
 #
 # def set_global_exception():

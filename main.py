@@ -1,4 +1,4 @@
-from kooji.dooractuator import DoorActuator
+from kooji.motor.dooractuator import DoorActuator
 import uasyncio as asyncio
 
 async def main():

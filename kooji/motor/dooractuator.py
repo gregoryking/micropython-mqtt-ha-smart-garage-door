@@ -1,11 +1,13 @@
 import uasyncio as asyncio
 import utime as time
-from config import TRANSITION_DURATION
+from config import TRANSITION_DURATION, OPEN_SENSOR_PIN, CLOSED_SENSOR_PIN
 import logging
+from kooji.machine import Pin
+from kooji.primitives.switch import Switch
+from kooji.primitives.delay_ms import Delay_ms
 
 log = logging.getLogger("motor")
-log.setLevel(logging.DEBUG)
-
+log.setLevel(1)
 
 class DoorActuator:
     # DOOR MOVEMENT
@@ -30,27 +32,78 @@ class DoorActuator:
 
     default_transition_time_total = TRANSITION_DURATION
 
-    def __init__(self, transition_duration=default_transition_time_total, refresh_ms=200, state_change_callback=None):
-        self.__next_movement = DoorActuator.OPENING
+    def __init__(self, transition_duration=default_transition_time_total, refresh_ms=200, next_movement=OPENING, position=CLOSED, door_state_callback=None, door_target_callback=None):
+        self.__next_movement = next_movement #DoorActuator.OPENING
         self.__movement = DoorActuator.STOPPED
-        self.__position = DoorActuator.CLOSED
+        self.__position = position
         self.__transition_time_total = transition_duration
         self.__refresh_ms = refresh_ms
         self.__transition_time_until_open = transition_duration
         self.__time_last_run_request = None
         self.__running_task = None
-        self.__stateChangeCallback = state_change_callback # unused at present
+        self.__door_state_callback = door_state_callback
+        self.__door_target_callback = door_target_callback
+
+        Switch.debounce_ms = 1
+        # Open sensor and callbacks
+        self.__open_sensor_pin = Pin(OPEN_SENSOR_PIN, Pin.IN, Pin.PULL_UP)
+        self.__open_sensor_pin.off()
+        open_switch = Switch(self.__open_sensor_pin)
+        open_switch.open_func(self.door_opened)  # TO-DO: Had to invert for pin logic on Unix port, check on real port
+        open_switch.close_func(self.door_closing) # TO-DO: Had to invert for pin logic on Unix port, check on real port
+        # Closed sensor and callbacks
+        self.__closed_sensor_pin = Pin(CLOSED_SENSOR_PIN, Pin.IN, Pin.PULL_UP)
+        self.__closed_sensor_pin.off()
+        closed_switch = Switch(self.__closed_sensor_pin)
+        closed_switch.open_func(self.door_closed) # TO-DO: Had to invert for pin logic on Unix port, check on real port
+        closed_switch.close_func(self.door_opening) # TO-DO: Had to invert for pin logic on Unix port, check on real port
+
+        try:
+            Pin.is_mock()
+            self.__running_with_pins = False
+            log.debug("\tinit\tRunning on hardware WITHOUT Pins")
+        except AttributeError:
+            self.__running_with_pins = True
+            log.debug("\tinit\tRunning on hardware WITH Pins")
+
+        # Initialise positions
+        self.update_position()
 
         if self.__transition_time_total % self.__refresh_ms != 0:
             raise ValueError("refresh_ms must be a factor of transition_duration")
+
+    def door_closed(self):
+        print("******DOOR CLOSED")
+        self.__movement = DoorActuator.STOPPED
+        self.__position = DoorActuator.CLOSED
+        self.__next_movement = DoorActuator.OPENING
+
+    def door_opened(self):
+        print("******DOOR OPENED")
+        self.__movement = DoorActuator.STOPPED
+        self.__position = DoorActuator.OPEN
+        self.__next_movement = DoorActuator.CLOSING
+
+    def door_closing(self):
+        print("******DOOR CLOSING")
+        self.__movement = DoorActuator.CLOSING
+        self.__position = DoorActuator.PART_OPEN
+
+    def door_opening(self):
+        print("******DOOR OPENING")
+        self.__movement = DoorActuator.OPENING
+        self.__position = DoorActuator.PART_OPEN
 
     def door_position(self):
         percentage_closed = self.__transition_time_until_open / self.__transition_time_total
         status = None
         if self.movement == DoorActuator.STOPPED:
             status = DoorActuator.position_labels[self.position]
+            if status == "Part Open":
+                status = "Stopped" #   HACK: Overriding Part Open with Stopped
         else:
             status = DoorActuator.movement_labels[self.movement]
+        type(self.__door_state_callback) == 'function' and self.__door_state_callback(status=status)
         return "{} ({:.0%})".format(status, percentage_closed)
 
     def print_status(self, level=logging.DEBUG):
@@ -82,21 +135,18 @@ class DoorActuator:
 
     def __set_movement(self, state):
         self.__movement = state
-        # self.print_status()
 
-    # @state.setter
-    # def state(self, state):
-    #     self.__state = state
-    #     self.__stateChangeCallback(state)
-
-    #
     async def move(self):
         log.info("\tmove\tStarting door movement")
         self.print_status(logging.INFO)
         while True:
-            await asyncio.sleep_ms(self.__refresh_ms)
+            log.debug('\tmove\ttransition_time_until_open %s', self.__transition_time_until_open)
+            log.debug('\tmove\tposition %s', self.__position)
+
             self.__transition_time_until_open -= (self.__movement * self.__refresh_ms)
             self.update_position()
+            await asyncio.sleep_ms(self.__refresh_ms) # Moved sleep after updating position to ensure positions are updated before next checks are run (Bit of a hack?)
+            self.print_status(logging.DEBUG)
             if self.__position != DoorActuator.PART_OPEN:
                 self.__movement = DoorActuator.STOPPED
                 log.info("\tmove\tEnding door movement")
@@ -104,15 +154,19 @@ class DoorActuator:
                 break
 
     def update_position(self):
+        log.debug('\tupdate_position\ttransition_time_until_open %s', self.__transition_time_until_open)
+
         if self.__transition_time_until_open % self.__transition_time_total == 0:
             if self.__transition_time_until_open == 0:
-                self.__position = DoorActuator.OPEN
-                self.__next_movement = DoorActuator.CLOSED
+                log.info("\tupdate_position\tSetting open sensor pin ON")
+                self.__open_sensor_pin.on()
             if self.__transition_time_until_open == self.__transition_time_total:
-                self.__position = DoorActuator.CLOSED
-                self.__next_movement = DoorActuator.OPENING
+                log.info("\tupdate_position\tSetting closed sensor pin ON")
+                self.__closed_sensor_pin.on()
         else:
-            self.__position = DoorActuator.PART_OPEN
+            log.info("\tupdate_position\tSetting both closed and open sensor pins OFF")
+            self.__open_sensor_pin.off()
+            self.__closed_sensor_pin.off()
 
     async def run(self):
         log.info("\trun\tProcessing run request from [%s] position and [%s] movement state",
@@ -137,6 +191,7 @@ class DoorActuator:
             log.info("\trun\t%s", "Scheduling a new move task")
             self.__set_movement(self.__next_movement)
             self.__next_movement *= -1
+            # self.__door_target_callback(self.position_labels[self.__movement])
             self.__running_task = asyncio.create_task(self.move())
             await self.__running_task
             self.__set_movement(DoorActuator.STOPPED)

@@ -1,5 +1,5 @@
 import unittest
-from kooji.dooractuator import DoorActuator
+from kooji.motor.dooractuator import DoorActuator
 import uasyncio as asyncio
 
 # print("file is:{}".format(__file__))
@@ -36,7 +36,7 @@ def setup_and_run(seq):
     loop.run_until_complete(run_and_wait_seq(loop, coro, seq))
     loop.close()
     asyncio.new_event_loop()
-    return  actuator.position
+    return actuator.position
 
 
 # TO-DO, make the 2000 times relative to test configuration parameters

@@ -6,7 +6,7 @@ export CURDIR=$(pwd)
 export MICROPYPATH=":$HOME/.micropython/lib:/usr/lib/micropython:$CURDIR"
 echo $MICROPYPATH
 
-for TEST_FILE in $(ls kooji/*_test.py); do
+for TEST_FILE in $(ls kooji/motor/*_test.py); do
   IMPORT_NAME="${TEST_FILE%.*}"
   echo "Testing $IMPORT_NAME"
   micropython-dev $TEST_FILE

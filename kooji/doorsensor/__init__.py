@@ -15,7 +15,7 @@ class DoorSensor:
         # Positions will be updated by switch callbacks
         self.__next_movement = Movement.UNKNOWN
         self.__movement = Movement.UNKNOWN
-        self.__position = Position.UNKNOWN
+        self.__position = Position.PART_OPEN
 
         # Open sensor and callbacks
         self.open_sensor_pin = Pin(OPEN_SENSOR_PIN, Pin.IN, Pin.PULL_UP)
@@ -39,6 +39,10 @@ class DoorSensor:
             log.info("init\t\t\tRunning WITH Pins on hardware ")
 
     # TO-DO: Add a setter to movement and position callbacks that publishes mqtt messages
+
+    @property
+    def position(self):
+        return self.__position
 
     def door_closed(self):
         log.info("position\t\tDoor Closed")

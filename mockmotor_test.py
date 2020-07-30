@@ -14,7 +14,9 @@ def print_remaining(d):
 
 loop = asyncio.get_event_loop()
 ds = DoorSensor()
+# mm = MockMotor(door_sensor=ds, door_position_cb=yoyoyo, loop=loop, log_detailed_progress=True, current_time_to_open=5000, next_move_direction=Movement.CLOSING, movement=Movement.STOPPED)
 mm = MockMotor(door_sensor=ds, door_position_cb=yoyoyo, loop=loop, log_detailed_progress=True)
+# mm = MockMotor(door_position_cb=yoyoyo, loop=loop, log_detailed_progress=True)
 
 
 async def execute_and_wait(coro, wait):

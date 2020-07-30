@@ -66,7 +66,10 @@ class MockMotor:
 
     @property
     def position(self):
-        return self.__position
+        if self.__door_sensor is not None:
+            return self.__door_sensor.position
+        else:
+            return self.__position
 
     @position.setter
     def position(self, position):
@@ -79,7 +82,8 @@ class MockMotor:
                 self.__door_sensor.open_sensor_pin.off()
                 self.__door_sensor.closed_sensor_pin.off()
         # log.debug("Calling the position setter with" + str(position))
-        self.__position = position
+        else:
+            self.__position = position
 
     def toggle(self):
         # TO-DO: Add debounce logic to motor requests?

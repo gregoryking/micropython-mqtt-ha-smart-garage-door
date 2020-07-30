@@ -22,10 +22,28 @@ class Delay_ms:
         self._ktask = None  # timer task
         self._retrn = None  # Return value of launched callable
         self._do_trig = self._trig  # Avoid allocation in .trigger
+        # self._pause_remaining = None
+
+    @property
+    def timer(self):
+        return self._ktask
 
     def stop(self):
         if self._ktask is not None:
             self._ktask.cancel()
+
+    # def toggle_pause(self):
+    #     if self._pause_remaining is None and self.running:
+    #         self._pause_remaining = self.time_remaining
+    #         print("Paused with remaining duration {remaining}".format(remaining=self._pause_remaining))
+    #         self.stop()
+    #     elif self._pause_remaining is not None:
+    #         self.trigger(duration=self._pause_remaining)
+    #         print("Resumed with remaining duration {remaining}".format(remaining=self._pause_remaining))
+    #         self._pause_remaining = None
+    #
+    #     else:
+    #         print("Attempted to toggle pause an operation that is not running")
 
     def trigger(self, duration=0):  # Update end time
         now = ticks_ms()
@@ -53,6 +71,13 @@ class Delay_ms:
 
     def rvalue(self):
         return self._retrn
+
+    @property
+    def time_remaining(self):
+        if self._tstop is not None:
+            return ticks_diff(self._tstop, ticks_ms())
+        else:
+            return None
 
     async def _timer(self, restart):
         if restart:  # Restore cached end time

@@ -6,45 +6,47 @@ from kooji.enums import Movement, Position
 from kooji.doorsensor import DoorSensor
 import logging
 
-TRANSITION_TIME_MS = 10000
+
+
 # logging.basicConfig(format='%(asctime)s %(levelname)-8s %(message)s',
 #                     level=logging.INFO,
 #                     datefmt='%Y-%m-%d %H:%M:%S')
 log = logging.getLogger("MockMotor")
-log.setLevel(logging.DEBUG)
-
+log.setLevel(logging.ERROR)
 
 class MockMotor:
+    TRANSITION_TIME_MS = 10000
+    DEBOUNCE_MS = 500
     """
     A class used to represent the movement of a toggle start-stop-reverse_start type motor for opening garage doors
     Purpose is to simulate the behaviour to help in the testing of other components
     """
     def __init__(self, door_status_cb=None, current_time_to_open=TRANSITION_TIME_MS, movement=Movement.STOPPED,
-                 next_move_direction=Movement.OPENING, loop=None, log_detailed_progress=False):
+                 next_move_direction=Movement.OPENING, loop=None, log_detailed_progress=False, time_to_open=TRANSITION_TIME_MS, debounce_ms=DEBOUNCE_MS):
         """
         Parameters
         ----------
 
         """
-        if not 0 <= current_time_to_open <= TRANSITION_TIME_MS:
+        if not 0 <= current_time_to_open <= time_to_open:
             raise ValueError("current_time_to_open must be between 0 [Closed] and TRANSITION_TIME_MS [Open] inclusive")
         if next_move_direction not in [Movement.CLOSING, Movement.OPENING]:
             raise ValueError("next_move_direction is invalid")
-        if (current_time_to_open == 0 and next_move_direction == Movement.OPENING) or (current_time_to_open == TRANSITION_TIME_MS and next_move_direction == Movement.CLOSING):
+        if (current_time_to_open == 0 and next_move_direction == Movement.OPENING) or (current_time_to_open == time_to_open and next_move_direction == Movement.CLOSING):
             raise ValueError("current_time_to_open and next_move_direction are inconsistent")
 
         self.__loop = loop
         self.__movement = movement
         self.__next_move_direction = next_move_direction
-        self.__transition_time_full_ms = TRANSITION_TIME_MS
+        self.__transition_time_full_ms = time_to_open
         self.__door_status_cb = door_status_cb
         self.__last_toggle_time = None
-        self.__debounce_ms = 500
+        self.__debounce_ms = debounce_ms
 
         # Initialise __position from based on current_time_to_open
         if current_time_to_open == 0:
             self.__position = Position.OPEN
-        elif current_time_to_open == TRANSITION_TIME_MS:
+        elif current_time_to_open == time_to_open:
             self.__position = Position.CLOSED
         else:
             self.__position = Position.PART_OPEN

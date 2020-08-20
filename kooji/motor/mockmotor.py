@@ -1,4 +1,5 @@
 import uasyncio as asyncio
+import utime as time
 from kooji.primitives.delay_ms import Delay_ms
 from random import choice
 from kooji.enums import Movement, Position
@@ -18,13 +19,12 @@ class MockMotor:
     A class used to represent the movement of a toggle start-stop-reverse_start type motor for opening garage doors
     Purpose is to simulate the behaviour to help in the testing of other components
     """
-    def __init__(self, door_sensor: DoorSensor = None, door_position_cb=None, current_time_to_open=TRANSITION_TIME_MS, movement=Movement.STOPPED,
+    def __init__(self, door_status_cb=None, current_time_to_open=TRANSITION_TIME_MS, movement=Movement.STOPPED,
                  next_move_direction=Movement.OPENING, loop=None, log_detailed_progress=False):
         """
         Parameters
         ----------
-        door_sensor : DoorSensor
-            A DoorSensor instance whose position attributes can be updated as a result of motor movements
+
         """
         if not 0 <= current_time_to_open <= TRANSITION_TIME_MS:
             raise ValueError("current_time_to_open must be between 0 [Closed] and TRANSITION_TIME_MS [Open] inclusive")
@@ -34,19 +34,20 @@ class MockMotor:
             raise ValueError("current_time_to_open and next_move_direction are inconsistent")
 
         self.__loop = loop
-        self.__door_sensor = door_sensor
         self.__movement = movement
         self.__next_move_direction = next_move_direction
         self.__transition_time_full_ms = TRANSITION_TIME_MS
-        self.__door_position_cb = door_position_cb
+        self.__door_status_cb = door_status_cb
+        self.__last_toggle_time = None
+        self.__debounce_ms = 500
 
         # Initialise __position from based on current_time_to_open
         if current_time_to_open == 0:
-            self.position = Position.OPEN
+            self.__position = Position.OPEN
         elif current_time_to_open == TRANSITION_TIME_MS:
-            self.position = Position.CLOSED
+            self.__position = Position.CLOSED
         else:
-            self.position = Position.PART_OPEN
+            self.__position = Position.PART_OPEN
 
         # Initialise __transition_time_remaining_ms based on current_time_to_open
         if self.__next_move_direction == Movement.OPENING:
@@ -60,33 +61,32 @@ class MockMotor:
         if log_detailed_progress:
             self.__loop.create_task(self.log_progress())
 
+        self.__door_status_cb(self.__movement, self.__position)
+
     @property
     def timer_coro(self):
         return self.__transition_timer._ktask
 
     @property
-    def position(self):
-        if self.__door_sensor is not None:
-            return self.__door_sensor.position
-        else:
-            return self.__position
+    def movement(self):
+        return self.__movement
 
-    @position.setter
-    def position(self, position):
-        if self.__door_sensor is not None:
-            if position == Position.CLOSED:
-                self.__door_sensor.closed_sensor_pin.on()
-            elif position == Position.OPEN:
-                self.__door_sensor.open_sensor_pin.on()
-            elif position == Position.PART_OPEN:
-                self.__door_sensor.open_sensor_pin.off()
-                self.__door_sensor.closed_sensor_pin.off()
-        # log.debug("Calling the position setter with" + str(position))
-        else:
-            self.__position = position
+    @property
+    def position(self):
+        return self.__position
 
     def toggle(self):
-        # TO-DO: Add debounce logic to motor requests?
+        # Ignore requests that happen within quick succession of first actioned request
+        last_toggle_time = self.__last_toggle_time
+        if time.ticks_diff(time.ticks_ms(), last_toggle_time) < self.__debounce_ms:  # Debounce repeated requests
+            log.info('\ttoggle\t\t\tDebounced toggle request')
+            if self.__transition_timer.time_remaining > 0:
+                return self.__transition_timer.timer
+            else:
+                return asyncio.sleep(0)
+        else:
+            self.__last_toggle_time = time.ticks_ms()
+
         if self.__movement in [Movement.CLOSING, Movement.OPENING]:
             self.__stop()
             self.__log_status('toggle\t\t')
@@ -96,18 +96,16 @@ class MockMotor:
             self.__log_status('toggle\t\t')
             return self.__transition_timer.timer
 
-
-
-
     def __move_to_next_position(self):
         self.__transition_timer = Delay_ms(self.__movement_complete,
                                            duration=self.__transition_time_remaining_ms)
         self.__transition_timer.trigger()
         # Update movement and position status
         self.__movement = self.__next_move_direction
-        self.position = Position.PART_OPEN
+        self.__position = Position.PART_OPEN
         # Toggle the next move direction
         self.__next_move_direction *= -1
+        self.__door_status_cb(self.__movement, self.__position)
 
     def __stop(self):
         # Grab the remaining time
@@ -118,19 +116,19 @@ class MockMotor:
         self.__movement = Movement.STOPPED
         # Invert the remaining time ready for move in next direction
         self.__transition_time_remaining_ms = self.__transition_time_full_ms - time_remaining
-        self.__door_position_cb(self.__movement, self.position)
+        self.__door_status_cb(self.__movement, self.__position)
 
     def __movement_complete(self):
         # Replenish remaining time for a full movement and update state
         self.__transition_time_remaining_ms = self.__transition_time_full_ms
-        self.position = self.__movement # Using fact that movements and position have same numeric encoding
+        self.__position = self.__movement # Using fact that movements and position have same numeric encoding
         self.__movement = Movement.STOPPED
         self.__next_move_direction *= 1
         self.__log_status('__movement_complete')
-        self.__door_position_cb(self.__movement, self.position)
+        self.__door_status_cb(self.__movement, self.__position)
 
     def __log_status(self, method):
-        log.info(" %s\tPosition: %s | Movement: %s | Next Move Direction: %s", method, Position.description[self.position], Movement.description[self.__movement], Movement.description[self.__next_move_direction])
+        log.info(" %s\tPosition: %s | Movement: %s | Next Move Direction: %s", method, Position.description[self.__position], Movement.description[self.__movement], Movement.description[self.__next_move_direction])
 
     async def log_progress(self):
         # while self.__movement in [Movement.CLOSING,

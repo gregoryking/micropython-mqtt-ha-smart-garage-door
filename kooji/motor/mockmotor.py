@@ -12,7 +12,7 @@ import logging
 #                     level=logging.INFO,
 #                     datefmt='%Y-%m-%d %H:%M:%S')
 log = logging.getLogger("MockMotor")
-log.setLevel(logging.ERROR)
+log.setLevel(logging.DEBUG)
 
 class MockMotor:
     TRANSITION_TIME_MS = 10000
@@ -22,7 +22,7 @@ class MockMotor:
     Purpose is to simulate the behaviour to help in the testing of other components
     """
     def __init__(self, door_status_cb=None, current_time_to_open=TRANSITION_TIME_MS, movement=Movement.STOPPED,
-                 next_move_direction=Movement.OPENING, loop=None, log_detailed_progress=False, time_to_open=TRANSITION_TIME_MS, debounce_ms=DEBOUNCE_MS):
+                 next_move_direction=Movement.OPENING, log_detailed_progress=False, time_to_open=TRANSITION_TIME_MS, debounce_ms=DEBOUNCE_MS):
         """
         Parameters
         ----------
@@ -35,7 +35,7 @@ class MockMotor:
         if (current_time_to_open == 0 and next_move_direction == Movement.OPENING) or (current_time_to_open == time_to_open and next_move_direction == Movement.CLOSING):
             raise ValueError("current_time_to_open and next_move_direction are inconsistent")
 
-        self.__loop = loop
+        self.__loop = asyncio.get_event_loop()
         self.__movement = movement
         self.__next_move_direction = next_move_direction
         self.__transition_time_full_ms = time_to_open

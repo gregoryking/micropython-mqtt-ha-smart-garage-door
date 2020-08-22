@@ -92,6 +92,7 @@ class DoorActuatorRunRequests(unittest.TestCase):
         position = setup_and_run([4000, 2000, 2000, 3000, None])
         self.assertTrue(position == Position.OPEN)
 
+    # TO-DO: Refactor setup to allow different start door positions to be added and tested
 
 if __name__ == '__main__':
     unittest.main()

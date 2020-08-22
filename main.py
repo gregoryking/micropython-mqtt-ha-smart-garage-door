@@ -1,10 +1,17 @@
-from kooji.motor.dooractuator import DoorActuator
 import uasyncio as asyncio
+from kooji.doorsensor import DoorSensor
+from kooji.dooractuator import DoorActuator
+import logging
+log = logging.getLogger("Main")
+
+# loop = asyncio.get_event_loop()
 
 async def main():
-    my_motor = DoorActuator(lambda x: print('State is ' + str(x)))
-    my_motor.run()
-    await asyncio.sleep(1000)
+
+    da = await DoorActuator.create()
+
+    while True:
+        await asyncio.sleep(60)
 
 
 asyncio.run(main())

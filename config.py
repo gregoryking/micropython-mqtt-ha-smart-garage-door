@@ -6,8 +6,8 @@
 # SERVER = "mqttserver"
 SERVER = "192.168.1.137"
 COMMAND_TOPIC = "home/garage/garagedoor/set"
-STATE_TOPIC = "home/garage/garagedoor"
-TARGET_TOPIC = "home/garage/garagedoortarget"
+DOOR_TARGET_TOPIC = "home/garage/garagedoor/target" # subscribe to and publish updates [Open, Closed]
+DOOR_STATE_TOPIC = "home/garage/garagedoor/state" # publish updates [Open, Closed, Opening, Closing, Stopped]
 AVAILABILITY_TOPIC = "home/garage/garagedoor/available"
 
 # Full time taken for door to move from open to closed or vice versa (ms)

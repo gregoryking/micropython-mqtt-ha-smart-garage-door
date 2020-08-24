@@ -4,6 +4,7 @@ from kooji.primitives.delay_ms import Delay_ms
 from random import choice
 from kooji.enums import Movement, Position
 from kooji.doorsensor import DoorSensor
+from config import TRANSITION_TIME_MS, DEBOUNCE_MS
 import logging
 
 
@@ -15,8 +16,8 @@ log = logging.getLogger("MockMotor")
 log.setLevel(logging.DEBUG)
 
 class MockMotor:
-    TRANSITION_TIME_MS = 10000
-    DEBOUNCE_MS = 500
+    TRANSITION_TIME_MS = TRANSITION_TIME_MS
+    DEBOUNCE_MS = DEBOUNCE_MS
     """
     A class used to represent the movement of a toggle start-stop-reverse_start type motor for opening garage doors
     Purpose is to simulate the behaviour to help in the testing of other components
@@ -82,7 +83,7 @@ class MockMotor:
         last_toggle_time = self.__last_toggle_time
         if time.ticks_diff(time.ticks_ms(), last_toggle_time) < self.__debounce_ms:  # Debounce repeated requests
             log.info('\ttoggle\t\t\tDebounced toggle request')
-            if self.__transition_timer.time_remaining > 0:
+            if self.__transition_timer.time_remaining is not None and self.__transition_timer.time_remaining > 0:
                 return self.__transition_timer.timer
             else:
                 return asyncio.sleep(0)

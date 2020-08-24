@@ -11,7 +11,8 @@ DOOR_STATE_TOPIC = "home/garage/garagedoor/state" # publish updates [Open, Close
 AVAILABILITY_TOPIC = "home/garage/garagedoor/available"
 
 # Full time taken for door to move from open to closed or vice versa (ms)
-TRANSITION_DURATION = 10000
+TRANSITION_TIME_MS = 10000
+DEBOUNCE_MS = 500
 
 # Hardware Pin scheme
 # +12v  GPIO  GND   GPIO              GPIO  GPIO  +3.3v +3.3v GPIO  GPIO

@@ -1,6 +1,6 @@
 import uasyncio as asyncio
 import utime as time
-from config import OPEN_SENSOR_PIN, CLOSED_SENSOR_PIN, DOOR_STATE_TOPIC
+from config import OPEN_SENSOR_PIN, CLOSED_SENSOR_PIN
 import logging
 from kooji.machine import Pin
 from kooji.primitives.switch import Switch
@@ -52,6 +52,10 @@ class DoorSensor:
     @property
     def movement(self):
         return self.__movement
+
+    @property
+    def moving(self):
+        return self.__movement in [Movement.CLOSING, Movement.OPENING]
 
     @property
     def next_movement(self):

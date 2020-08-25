@@ -7,6 +7,7 @@
 SERVER = "192.168.1.137"
 COMMAND_TOPIC = "home/garage/garagedoor/set"
 DOOR_TARGET_TOPIC = "home/garage/garagedoor/target" # subscribe to and publish updates [Open, Closed]
+DOOR_PUSH_BUTTON_TOPIC = "home/garage/garagedoor/pushbutton" # subscribe to and publish updates
 DOOR_STATE_TOPIC = "home/garage/garagedoor/state" # publish updates [Open, Closed, Opening, Closing, Stopped]
 AVAILABILITY_TOPIC = "home/garage/garagedoor/available"
 
@@ -29,35 +30,11 @@ PUSH_BUTTON_PIN=0 # 5 doesn't work as pushbutton?
 # MOVE_PULSE_DURATION = 600
 # STOP_PULSE_DURATION = 300
 # WAIT_DURATION = 1000
-MOVE_PULSE_DURATION = 6000
-STOP_PULSE_DURATION = 3000
-WAIT_DURATION = 10000
+MOVE_PULSE_DURATION = 200
+STOP_PULSE_DURATION = 100
+# WAIT_DURATION = 10000
 
 CLOSE_WITH_DELAY_PUSH_BUTTON_TRIGGER_TIME =3000
 CLOSE_WITH_DELAY_CLOSE_DELAY = 10000
 
 HIGH, LOW = 1, 0
-
-START_COMMANDS = [
-    {
-        "pinLevel": HIGH,
-        "duration": MOVE_PULSE_DURATION
-    },        
-    {
-        "pinLevel": LOW,
-        "duration": WAIT_DURATION
-    }
-]
-
-STOP_COMMANDS = [
-    {
-        "pinLevel": HIGH,
-        "duration": STOP_PULSE_DURATION
-    },
-    {
-        "pinLevel": LOW,
-        "duration": WAIT_DURATION
-    }
-]
-
-STOP_AND_RETURN_COMMANDS = STOP_COMMANDS + START_COMMANDS

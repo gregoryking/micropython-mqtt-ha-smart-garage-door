@@ -11,7 +11,8 @@ except AttributeError:
             pass
 
         def __init__(self, *args):
-            self.__value = None
+            # self.__value = None
+            self.__value = 0 # Changed to handle sensing in Pushbutton
 
         def value(self, value=None):
             if value is not None:

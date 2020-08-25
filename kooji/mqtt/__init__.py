@@ -1,6 +1,6 @@
 from mqtt_as import MQTTClient
 from config_mqtt import config
-from config import DOOR_TARGET_TOPIC
+from config import DOOR_TARGET_TOPIC, DOOR_PUSH_BUTTON_TOPIC
 import logging
 
 log = logging.getLogger("DoorSensor")
@@ -30,3 +30,4 @@ class MQTT:
 
     async def connection_handler(cclient):
         await cclient.subscribe(DOOR_TARGET_TOPIC, 1)
+        await cclient.subscribe(DOOR_PUSH_BUTTON_TOPIC, 1)

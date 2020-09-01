@@ -20,8 +20,8 @@ DEBOUNCE_MS = 500
 #                                                               VDD   RX   TX
 
 RELAY_PIN = (4, False)
-OPEN_SENSOR_PIN = (12, False)
-CLOSED_SENSOR_PIN = (5, False)
+OPEN_SENSOR_PIN = (12, True)
+CLOSED_SENSOR_PIN = (5, True)
 PUSH_BUTTON_PIN = (0, True)
 
 MOVE_PULSE_DURATION = 200

@@ -1,7 +1,6 @@
 import uasyncio as asyncio
 import utime as time
 from kooji.doorsensor import DoorSensor
-from kooji.motor.mockmotor import MockMotor
 from kooji.dooractuator.doorbutton import DoorButton
 from kooji.mqtt import MQTT
 from kooji.enums import Movement, Position
@@ -27,7 +26,17 @@ class DoorActuator(object):
         await self.__mqtt.connect()
 
         self.__door_sensor = DoorSensor(door_state_cb=self.door_state, door_target_cb=self.door_target)
-        self.__motor = MockMotor(door_status_cb=self.new_door_status, log_detailed_progress=True)
+
+        # Using absenceof uname to indicate running on Unix port
+        try:
+            from uos import uname
+        except ImportError:
+            # Use mockmotor on unix port
+            from kooji.motor.mockmotor import MockMotor
+            self.__motor = MockMotor(door_status_cb=self.new_door_status, log_detailed_progress=True)
+        else:
+            from kooji.motor.motor import Motor
+            self.__motor = Motor()
 
         self.__corrective_movement_task = None
         self.__corrective_movement_status = CorrectiveMovement.NONE

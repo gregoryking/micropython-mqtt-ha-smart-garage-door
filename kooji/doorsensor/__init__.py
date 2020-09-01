@@ -20,20 +20,20 @@ class DoorSensor:
 
         # Open sensor and callbacks
         self.open_sensor_signal = Signal(Pin(OPEN_SENSOR_PIN[0], Pin.IN, OPEN_SENSOR_PIN[1]), invert=OPEN_SENSOR_PIN[1])
-
-        self.open_sensor_signal.off()
         open_switch = Switch(self.open_sensor_signal)
         open_switch.open_func(self.__door_opened)
         open_switch.close_func(self.__door_closing)
         # Closed sensor and callbacks
         self.closed_sensor_signal = Signal(Pin(CLOSED_SENSOR_PIN[0], Pin.IN, CLOSED_SENSOR_PIN[1]), invert=CLOSED_SENSOR_PIN[1])
-        self.closed_sensor_signal.off()
         closed_switch = Switch(self.closed_sensor_signal)
         closed_switch.open_func(self.__door_closed)
         closed_switch.close_func(self.__door_opening)
 
         self.__door_state_cb = door_state_cb
         self.__door_target_cb = door_target_cb
+
+        # Initialise position
+        self.__init_door()
 
         try:
             Pin.is_mock()
@@ -59,6 +59,21 @@ class DoorSensor:
     def next_movement(self):
         return self.__next_movement
 
+    # Movements derived from sensors
+
+    def __init_door(self):
+        log.info("__init_door\t\tInitialising door values")
+        if self.open_sensor_signal.value() == 1 and self.closed_sensor_signal.value() == 0:
+            self.__door_opened()
+        elif self.open_sensor_signal.value() == 0 and self.closed_sensor_signal.value() == 1:
+            self.__door_closed()
+        elif self.open_sensor_signal.value() == 0 and self.closed_sensor_signal.value() == 0:
+            self.__position = Position.PART_OPEN
+            self.__door_state_cb("Open")
+        else:
+            log.error("__init_door\t\tUnexpected DoorSensor readings")
+
+
     def __door_closed(self):
         log.info("position\t\tDoor Closed")
         if self.__movement != Movement.CLOSING: # If didn't arrive here via a known closing movement, set correct target
@@ -67,8 +82,6 @@ class DoorSensor:
         self.__position = Position.CLOSED
         self.__next_movement = Movement.OPENING
         self.__door_state_cb("Closed")
-
-    # Movements derived from sensors
 
     def __door_opened(self):
         log.info("position\t\tDoor Opened")

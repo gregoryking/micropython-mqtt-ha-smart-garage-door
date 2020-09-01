@@ -1,3 +1,3 @@
 unittest
-uasyncio
+#uasyncio
 logging

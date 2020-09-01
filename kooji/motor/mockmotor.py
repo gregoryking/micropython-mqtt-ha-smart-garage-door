@@ -1,9 +1,7 @@
 import uasyncio as asyncio
 import utime as time
 from kooji.primitives.delay_ms import Delay_ms
-from random import choice
 from kooji.enums import Movement, Position
-from kooji.doorsensor import DoorSensor
 from config import TRANSITION_TIME_MS, DEBOUNCE_MS
 import logging
 

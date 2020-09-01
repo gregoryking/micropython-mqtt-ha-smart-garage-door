@@ -2,7 +2,7 @@ import uasyncio as asyncio
 import utime as time
 from config import OPEN_SENSOR_PIN, CLOSED_SENSOR_PIN
 import logging
-from kooji.machine import Pin
+from kooji.machine import Pin, Signal
 from kooji.primitives.switch import Switch
 from kooji.enums import Movement, Position
 
@@ -19,17 +19,18 @@ class DoorSensor:
         self.__position = Position.UNKNOWN
 
         # Open sensor and callbacks
-        self.open_sensor_pin = Pin(OPEN_SENSOR_PIN, Pin.IN, Pin.PULL_UP)
-        self.open_sensor_pin.off()
-        open_switch = Switch(self.open_sensor_pin)
-        open_switch.open_func(self.__door_opened)  # TO-DO: Had to invert for pin logic on Unix port, check on real port
-        open_switch.close_func(self.__door_closing) # TO-DO: Had to invert for pin logic on Unix port, check on real port
+        self.open_sensor_signal = Signal(Pin(OPEN_SENSOR_PIN[0], Pin.IN, OPEN_SENSOR_PIN[1]), invert=OPEN_SENSOR_PIN[1])
+
+        self.open_sensor_signal.off()
+        open_switch = Switch(self.open_sensor_signal)
+        open_switch.open_func(self.__door_opened)
+        open_switch.close_func(self.__door_closing)
         # Closed sensor and callbacks
-        self.closed_sensor_pin = Pin(CLOSED_SENSOR_PIN, Pin.IN, Pin.PULL_UP)
-        self.closed_sensor_pin.off()
-        closed_switch = Switch(self.closed_sensor_pin)
-        closed_switch.open_func(self.__door_closed) # TO-DO: Had to invert for pin logic on Unix port, check on real port
-        closed_switch.close_func(self.__door_opening) # TO-DO: Had to invert for pin logic on Unix port, check on real port
+        self.closed_sensor_signal = Signal(Pin(CLOSED_SENSOR_PIN[0], Pin.IN, CLOSED_SENSOR_PIN[1]), invert=CLOSED_SENSOR_PIN[1])
+        self.closed_sensor_signal.off()
+        closed_switch = Switch(self.closed_sensor_signal)
+        closed_switch.open_func(self.__door_closed)
+        closed_switch.close_func(self.__door_opening)
 
         self.__door_state_cb = door_state_cb
         self.__door_target_cb = door_target_cb
@@ -41,9 +42,6 @@ class DoorSensor:
         except AttributeError:
             self.__running_with_pins = True
             log.info("init\t\t\tRunning WITH Pins on hardware ")
-
-
-    # TO-DO: Add a setter to movement and position callbacks that publishes mqtt messages
 
     @property
     def position(self):

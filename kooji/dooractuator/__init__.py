@@ -2,11 +2,10 @@ import uasyncio as asyncio
 import utime as time
 from kooji.doorsensor import DoorSensor
 from kooji.motor.mockmotor import MockMotor
+from kooji.dooractuator.doorbutton import DoorButton
 from kooji.mqtt import MQTT
-from kooji.machine import Pin
-from kooji.primitives.pushbutton import Pushbutton
 from kooji.enums import Movement, Position
-from config import DOOR_STATE_TOPIC, DOOR_TARGET_TOPIC, DOOR_PUSH_BUTTON_TOPIC, DEBOUNCE_MS, PUSH_BUTTON_PIN
+from config import DOOR_STATE_TOPIC, DOOR_TARGET_TOPIC, DOOR_PUSH_BUTTON_TOPIC, DEBOUNCE_MS
 import logging
 
 log = logging.getLogger("DoorActuator")
@@ -17,13 +16,6 @@ class CorrectiveMovement:
     IN_PROGRESS = 1
     COMPLETE = 2
 
-class PushButtonLifecycle:
-    NONE = 0
-    DEPRESSED = 1
-    DEPRESSED_AND_CAUSED_STOP =2
-    DEPRESSED_LONG_AND_CAUSED_STOP = 3
-    DEPRESSED_LONG = 4
-    RELEASED = 5
 
 class DoorActuator(object):
 
@@ -44,13 +36,7 @@ class DoorActuator(object):
 
         self.__target = self.__door_sensor.position
 
-        self.__push_button = Pushbutton(Pin(PUSH_BUTTON_PIN, Pin.IN, Pin.PULL_UP)) # TODO: Check that PULL_UP is indeed correct for this pin
-        self.__push_button.press_func(self.__push_button_down)
-        self.__push_button.long_func(self.__push_button_long_press_detected)
-        self.__push_button.release_func(self.__push_button_up)
-        self.__push_button_lifecycle = PushButtonLifecycle.NONE
-
-        self.__delayed_toggle_task = None
+        self.__door_button = DoorButton(door_sensor=self.__door_sensor, toggle_cb=self.toggle)
 
     def door_state(self, status):
         log.info("door_state\t\tPublishing state %s to DOOR_STATE_TOPIC", status)
@@ -66,14 +52,14 @@ class DoorActuator(object):
     def new_door_status(self, movement, position):
         log.info("new_door_status\t\tNew door status received from mock motor, switches being updated accordingly")
         if position == Position.CLOSED:
-            self.__door_sensor.closed_sensor_pin.on()
+            self.__door_sensor.closed_sensor_signal.on()
         elif position == Position.OPEN:
-            self.__door_sensor.open_sensor_pin.on()
+            self.__door_sensor.open_sensor_signal.on()
 
         if movement == Movement.OPENING:
-            self.__door_sensor.closed_sensor_pin.off()
+            self.__door_sensor.closed_sensor_signal.off()
         elif movement == Movement.CLOSING:
-            self.__door_sensor.open_sensor_pin.off()
+            self.__door_sensor.open_sensor_signal.off()
 
 
     # def set_door_tartget(self, target):
@@ -91,52 +77,25 @@ class DoorActuator(object):
             target_position = [key for key, value in Position.description.items() if value == msg_str][0]
             self.set_target(target_position)
         if topic_str == DOOR_PUSH_BUTTON_TOPIC and retained is False: # TODO: Revisit wheteher retained should be ignored - may actually be desirable to action based on retained messages that had been missed
-            # self.toggle()
-            try:
-                self.__delayed_toggle_task.cancel()
-            except AttributeError:
-                log.info("There was no __delayed_toggle_task to cancel")
-            self.__delayed_toggle_task = self.__loop.create_task(self.delayed_toggle())
+            if msg_str == 'short':
+                self.__loop.create_task(self.__door_button.simulate_short_button_press())
+            elif msg_str == 'long':
+                self.__loop.create_task(self.__door_button.simulate_long_button_press())
 
-    def __push_button_down(self):
-        self.__push_button_lifecycle = PushButtonLifecycle.DEPRESSED
-        if self.__door_sensor.moving:
-            log.info("__push_button_down\tDoor moving, toggling motor to stop movement now")
-            self.__push_button_lifecycle = PushButtonLifecycle.DEPRESSED_AND_CAUSED_STOP
-            self.__motor.toggle()
-
-    def __push_button_long_press_detected(self):
-        if self.__push_button_lifecycle == PushButtonLifecycle.DEPRESSED_AND_CAUSED_STOP:
-            self.__push_button_lifecycle = PushButtonLifecycle.DEPRESSED_LONG_AND_CAUSED_STOP
-        else:
-            self.__push_button_lifecycle = PushButtonLifecycle.DEPRESSED_LONG
-
-    def __push_button_up(self):
-        if self.__push_button_lifecycle in [PushButtonLifecycle.DEPRESSED_AND_CAUSED_STOP, PushButtonLifecycle.DEPRESSED_LONG_AND_CAUSED_STOP]:
-            pass # Don't do anthing on button up when the down caused a stop
-        elif not self.__door_sensor.moving: # Only cause a toggle when door is not moving because of some other another action
-            if self.__push_button_lifecycle == PushButtonLifecycle.DEPRESSED:
-                log.info("__push_button_up\tShort press release detected, toggling motor")
-                self.__motor.toggle()
-            elif self.__push_button_lifecycle == PushButtonLifecycle.DEPRESSED_LONG and not self.__door_sensor.moving:
-                log.info("__push_button_up\tLong press release detected, toggling motor after a delay")
-                self.__loop.create_task(self.delayed_toggle)
-        self.__push_button_lifecycle = PushButtonLifecycle.RELEASED
-
-    def toggle(self):
-        log.info("toggle\tToggle operation called")
-        self.__motor.toggle()
-        # TODO: Could add logic here to keep the target up to date (which couldn't be done for RF remote control and would generally neeed to handle gracefully - not adding for now is a good test of how that would behave)
-
-    async def delayed_toggle(self):
-        for i in range (10, 0, -1):
+    async def toggle(self, toggle_type, delay=0,):
+        for i in range (delay, 0, -1):
             log.info("delayed_toggle\tDoor moving in %d second(s)", i)
             # TODO: Play audible tones (increasing frequency) to indicate movement operation is about to happen
             await asyncio.sleep(1)
             if self.__door_sensor.moving or self.__corrective_movement_status == CorrectiveMovement.IN_PROGRESS:
                 log.info("delayed_toggle\tAborting delayed toggle operation, another movement detected")
                 return
-        self.toggle()
+        log.info("toggle\tToggle operation called")
+        self.__motor.toggle()
+        if toggle_type == "start":
+            self.__door_sensor.door_started_while_stopped()
+        if toggle_type == "stop":
+            self.__door_sensor.door_stopped_while_moving()
 
     def set_target(self, target):
         target_str = Position.description[target]
@@ -144,8 +103,8 @@ class DoorActuator(object):
         last_call_time = self.__last_call_time
         elapsed_since_last_processed_call = time.ticks_diff(time.ticks_ms(), last_call_time)
 
-        # Disregard requests whose target state is already being actioned, happen too soon after a prior request or may interfere with already running slow running corrective
-        # requests
+        # Disregard requests whose target state is already being actioned, happen too soon after a prior request or
+        # may interfere with already running slow running corrective requests
         if self.__target == target:
             log.info("set_target\t\tReceived request to set door target to %s, ignoring as already know I'm aiming "
                      "for %s", target_str, self_target_str)
@@ -154,12 +113,12 @@ class DoorActuator(object):
             log.info("set_target\t\tReceived request to set door target to %s, ignoring as only %d ms have passed "
                      "since last call processing began. Debouncing threshold set to %d ms "
                      , target_str, elapsed_since_last_processed_call, DEBOUNCE_MS)
-            self.door_target(self_target_str)
+            self.door_target(self_target_str) # Correct target state (will result in MQTT extra message that will be discounted so cause no harm)
             return
         elif self.__corrective_movement_status == CorrectiveMovement.IN_PROGRESS:
             log.info("set_target\t\tCorrective movement in progress to %s, ignoring request to set target to %s and "
                      "resetting target state to %s", self_target_str, target_str,  self_target_str)
-            self.door_target(self_target_str)
+            self.door_target(self_target_str)  # Correct target state (will result in MQTT extra message that will be discounted so cause no harm)
             return
 
         door_position = self.__door_sensor.position
@@ -196,7 +155,6 @@ class DoorActuator(object):
             log.info("set_target\t\tReceived request to set door target to %s, but door is currently %s. Calling __stop_and_return",
                      target_str, door_movement_str)
             self.__corrective_movement_task = self.__loop.create_task(self.__stop_and_return())
-            # TODO: Add task running check to beginning of set_target which cancels if it exists and is running.
         # Door stopped, part_open and set to go in right direction on next movement
         elif door_movement == Movement.STOPPED and door_position == Position.PART_OPEN and target == door_next_movement:
             log.info("set_target\t\tReceived request to set door target to %s. Door is currently %s, requesting %s of door",
@@ -213,12 +171,6 @@ class DoorActuator(object):
                 "set_target\t\tReceived request to set door target to %s, door is currently %s, %s and next movement is %s.",
                 target_str, door_movement_str, door_position_str, door_next_movement_str)
             self.__motor.toggle()
-            # TODO: Approach that taken here thus far is to toggle the motor to get it to a known state. To keep
-            # homekit correct, we need to set the target to be in line with status. Need to work out how to do this
-            # ensuring it doesn't balls things up (eg by keeping retriggering set_target operations as a result.
-            # Potential approach could be to call set_target whenever it reaches Closed or Open position having
-            # previously had unknown next_movement? Possible okay because on next call set_target will ignore because
-            # it knows it got to the right place, but is it a bit spammy on the mqtt??
         # Does this condition ever trigger? Error log if it does so we can work out what to do with it
         else:
             log.error(

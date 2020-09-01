@@ -31,11 +31,11 @@ class DoorActuator(object):
         try:
             from uos import uname
         except ImportError:
-            # Use mockmotor on unix port
-            from kooji.motor.mockmotor import MockMotor
+            # Use MockMotor on unix port
+            from kooji.motor import MockMotor
             self.__motor = MockMotor(door_status_cb=self.new_door_status, log_detailed_progress=True)
         else:
-            from kooji.motor.motor import Motor
+            from kooji.motor import Motor
             self.__motor = Motor()
 
         self.__corrective_movement_task = None

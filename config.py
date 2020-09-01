@@ -4,7 +4,7 @@ PASSWORD = ***REMOVED***
 
 # MQTT
 # SERVER = "mqttserver"
-SERVER = "192.168.1.137"
+MQTT_SERVER = "192.168.1.137"
 DOOR_TARGET_TOPIC = "home/garage/garagedoor/target" # subscribe to and publish updates [Open, Closed]
 DOOR_PUSH_BUTTON_TOPIC = "home/garage/garagedoor/pushbutton" # subscribe to and publish updates
 DOOR_STATE_TOPIC = "home/garage/garagedoor/state" # publish updates [Open, Closed, Opening, Closing, Stopped]

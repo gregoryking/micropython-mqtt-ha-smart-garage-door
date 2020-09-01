@@ -1,15 +1,14 @@
-from mqtt_as import MQTTClient
-from config_mqtt import config
-from config import DOOR_TARGET_TOPIC, DOOR_PUSH_BUTTON_TOPIC
+from .mqtt_as import MQTTClient, config
+from config import DOOR_TARGET_TOPIC, DOOR_PUSH_BUTTON_TOPIC, MQTT_SERVER
 import logging
 
-log = logging.getLogger("DoorSensor")
-
+log = logging.getLogger("MQTT")
 
 class MQTT:
 
     def __init__(self, subscription_cb=None):
         MQTTClient.DEBUG = True  # Optional: print diagnostic messages
+        config['server'] = MQTT_SERVER
         if subscription_cb is not None:
             config['subs_cb'] = subscription_cb
         else:

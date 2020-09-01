@@ -24,7 +24,7 @@ try:
     from machine import unique_id
     import network
 except:
-    from unix_fix import *
+    from .unix_fix import *
 
 gc.collect()
 from sys import platform

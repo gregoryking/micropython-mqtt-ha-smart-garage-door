@@ -8,11 +8,12 @@ class Motor:
         relay_pin = Pin(RELAY_PIN[0], Pin.OUT, RELAY_PIN[1])
         self.__relay_signal = Signal(relay_pin, invert=RELAY_PIN[1])
         self.__loop = asyncio.get_event_loop()
+        print("Using MOVE_PULSE_DURATION of %d", MOVE_PULSE_DURATION)
 
     def toggle(self):
         self.__loop.create_task(self.__pulse_coro(MOVE_PULSE_DURATION))
 
     async def __pulse_coro(self, period):
         self.__relay_signal.on()
-        asyncio.sleep_ms(period)
+        await asyncio.sleep_ms(period)
         self.__relay_signal.off()

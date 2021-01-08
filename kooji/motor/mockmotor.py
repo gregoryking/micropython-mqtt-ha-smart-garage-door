@@ -81,21 +81,21 @@ class MockMotor:
         last_toggle_time = self.__last_toggle_time
         if time.ticks_diff(time.ticks_ms(), last_toggle_time) < self.__debounce_ms:  # Debounce repeated requests
             log.info('\ttoggle\t\t\tDebounced toggle request')
-            if self.__transition_timer.time_remaining is not None and self.__transition_timer.time_remaining > 0:
-                return self.__transition_timer.timer
-            else:
-                return asyncio.sleep(0)
+            # if self.__transition_timer.time_remaining is not None and self.__transition_timer.time_remaining > 0:
+            #     return self.__transition_timer.timer
+            # else:
+            return
         else:
             self.__last_toggle_time = time.ticks_ms()
 
         if self.__movement in [Movement.CLOSING, Movement.OPENING]:
             self.__stop()
             self.__log_status('toggle\t\t')
-            return asyncio.sleep(0)
+            return
         elif self.__movement == Movement.STOPPED:
             self.__move_to_next_position()
             self.__log_status('toggle\t\t')
-            return self.__transition_timer.timer
+            await self.__transition_timer.timer
 
     def __move_to_next_position(self):
         self.__transition_timer = Delay_ms(self.__movement_complete,

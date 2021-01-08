@@ -17,7 +17,7 @@ class PushButtonLifecycle:
 class DoorButton:
     def __init__(self, door_sensor, toggle_cb):
         self.__loop = asyncio.get_event_loop()
-        self.__push_button_signal = Signal(Pin(PUSH_BUTTON_PIN[0], Pin.IN, PUSH_BUTTON_PIN[1]), invert=PUSH_BUTTON_PIN[1])
+        self.__push_button_signal = Signal(*PUSH_BUTTON_PIN["pinArgs"], invert=PUSH_BUTTON_PIN["inverted"])
         self.__push_button = Pushbutton(self.__push_button_signal) # TODO: Check that PULL_UP is indeed correct for this pin
         self.__push_button.press_func(self.__push_button_down)
         self.__push_button.long_func(self.__push_button_long_press_detected)

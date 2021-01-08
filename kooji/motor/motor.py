@@ -5,13 +5,12 @@ from config import RELAY_PIN, MOVE_PULSE_DURATION
 
 class Motor:
     def __init__(self):
-        relay_pin = Pin(RELAY_PIN[0], Pin.OUT, RELAY_PIN[1])
-        self.__relay_signal = Signal(relay_pin, invert=RELAY_PIN[1])
+        self.__relay_signal = Signal(*RELAY_PIN["pinArgs"], invert=RELAY_PIN["inverted"])
         self.__loop = asyncio.get_event_loop()
         print("Using MOVE_PULSE_DURATION of %d", MOVE_PULSE_DURATION)
 
-    def toggle(self):
-        self.__loop.create_task(self.__pulse_coro(MOVE_PULSE_DURATION))
+    async def toggle(self):
+        await self.__pulse_coro(MOVE_PULSE_DURATION)
 
     async def __pulse_coro(self, period):
         self.__relay_signal.on()

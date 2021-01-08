@@ -19,12 +19,12 @@ class DoorSensor:
         self.__position = Position.UNKNOWN
 
         # Open sensor and callbacks
-        self.open_sensor_signal = Signal(Pin(OPEN_SENSOR_PIN[0], Pin.IN, OPEN_SENSOR_PIN[1]), invert=OPEN_SENSOR_PIN[1])
+        self.open_sensor_signal = Signal(*OPEN_SENSOR_PIN["pinArgs"], invert=OPEN_SENSOR_PIN["inverted"])
         open_switch = Switch(self.open_sensor_signal)
         open_switch.open_func(self.__door_opened)
         open_switch.close_func(self.__door_closing)
         # Closed sensor and callbacks
-        self.closed_sensor_signal = Signal(Pin(CLOSED_SENSOR_PIN[0], Pin.IN, CLOSED_SENSOR_PIN[1]), invert=CLOSED_SENSOR_PIN[1])
+        self.closed_sensor_signal = Signal(*CLOSED_SENSOR_PIN["pinArgs"], invert=CLOSED_SENSOR_PIN["inverted"])
         closed_switch = Switch(self.closed_sensor_signal)
         closed_switch.open_func(self.__door_closed)
         closed_switch.close_func(self.__door_opening)

@@ -75,7 +75,7 @@ class DoorSensor:
 
 
     def __door_closed(self):
-        log.info("position\t\tDoor Closed")
+        log.info("__door_closed\t\tDoor Closed")
         if self.__movement != Movement.CLOSING: # If didn't arrive here via a known closing movement, set correct target
             self.__door_target_cb("Closed")
         self.__movement = Movement.STOPPED
@@ -84,7 +84,7 @@ class DoorSensor:
         self.__door_state_cb("Closed")
 
     def __door_opened(self):
-        log.info("position\t\tDoor Opened")
+        log.info("__door_opened\t\tDoor Opened")
         if self.__movement != Movement.OPENING: # If didn't arrive here via a known closing movement, set correct target
             self.__door_target_cb("Open")
         self.__movement = Movement.STOPPED
@@ -94,7 +94,7 @@ class DoorSensor:
         self.__door_state_cb("Open")
 
     def __door_closing(self):
-        log.info("movement\t\tDoor Closing")
+        log.info("__door_closing\t\tDoor Closing")
         self.__movement = Movement.CLOSING
         self.__position = Position.PART_OPEN
         self.__door_target_cb("Closed")
@@ -102,7 +102,7 @@ class DoorSensor:
 
     # noinspection MicroPythonRequirements
     def __door_opening(self):
-        log.info("position\t\tDoor Opening")
+        log.info("__door_opening\t\tDoor Opening")
         self.__movement = Movement.OPENING
         self.__position = Position.PART_OPEN
         self.__door_target_cb("Open")

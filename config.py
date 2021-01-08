@@ -1,3 +1,5 @@
+from kooji.machine import Pin
+
 # Wireless Credentials
 ESSID = ***REMOVED***
 PASSWORD = ***REMOVED***
@@ -12,19 +14,20 @@ AVAILABILITY_TOPIC = "home/garage/garagedoor/available"
 
 # Full time taken for door to move from open to closed or vice versa (ms)
 TRANSITION_TIME_MS = 10000
-DEBOUNCE_MS = 500
+
 
 # Hardware Pin scheme
 # +12v  GPIO  GND   GPIO                    GPIO  GPIO  +3.3v +3.3v GPIO  GPIO
 # [ + ] [12 ] [ - ] [ 5 ] [ x ] [ x ] [ x ] [ 4 ] [ 0 ] [ + ] [ + ] [ 3 ] [ 1 ]
 #                                                               VDD   RX   TX
+# GPIO Number, pull, invert
+RELAY_PIN = {"pinArgs": (5, Pin.OUT, Pin.PULL_UP), "inverted": False}
+OPEN_SENSOR_PIN = {"pinArgs": (4, Pin.IN, Pin.PULL_UP), "inverted": False}
+CLOSED_SENSOR_PIN = {"pinArgs": (14, Pin.IN, Pin.PULL_UP), "inverted": False}
+PUSH_BUTTON_PIN = {"pinArgs": (12, Pin.IN, Pin.PULL_UP), "inverted": True}
 
-RELAY_PIN = (4, False)
-OPEN_SENSOR_PIN = (12, True)
-CLOSED_SENSOR_PIN = (5, True)
-PUSH_BUTTON_PIN = (0, True)
-
-MOVE_PULSE_DURATION = 200
+MOVE_PULSE_DURATION = 1000
+DEBOUNCE_MS = 500 + MOVE_PULSE_DURATION
 
 CLOSE_WITH_DELAY_PUSH_BUTTON_TRIGGER_TIME =3000
 CLOSE_WITH_DELAY_CLOSE_DELAY = 10000

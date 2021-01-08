@@ -118,7 +118,11 @@ class DoorSensor:
         self.__door_state_cb("Stopped")
 
     def door_started_while_stopped(self):
-        if self.__next_movement == Movement.CLOSING:
-            self.__door_closing()
-        elif self.__next_movement == Movement.OPENING:
-            self.__door_opening()
+        # Only do these updates if the door is not in a Closed or Open position, because the sensors will trigger
+        # that movement in this case anyway and we don't want a door to be declared moving before it actually is in
+        # these cases
+        if self.__position not in [Position.OPEN, Position.CLOSED]:
+            if self.__next_movement == Movement.CLOSING:
+                self.__door_closing()
+            elif self.__next_movement == Movement.OPENING:
+                self.__door_opening()

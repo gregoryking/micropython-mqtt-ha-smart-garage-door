@@ -38,8 +38,8 @@ class DoorActuator(object):
             from kooji.motor import Motor
             self.__motor = Motor()
 
-        self.__corrective_movement_task = None
         self.__corrective_movement_status = CorrectiveMovement.NONE
+        self.__toggle_in_progress = False
 
         self.__last_call_time = None
 
@@ -84,7 +84,8 @@ class DoorActuator(object):
             topic_str, msg_str, current_door_position, current_door_movement)
         if topic_str == DOOR_TARGET_TOPIC and retained is False: # TODO: Revisit wheteher retained should be ignored - may actually be desirable to action based on retained messages that had been missed
             target_position = [key for key, value in Position.description.items() if value == msg_str][0]
-            self.set_target(target_position)
+            self.__loop.create_task(self.set_target(target_position))
+        # MQTT topic used only for simulation testing of button presses
         if topic_str == DOOR_PUSH_BUTTON_TOPIC and retained is False: # TODO: Revisit wheteher retained should be ignored - may actually be desirable to action based on retained messages that had been missed
             if msg_str == 'short':
                 self.__loop.create_task(self.__door_button.simulate_short_button_press())
@@ -100,16 +101,16 @@ class DoorActuator(object):
                 log.info("delayed_toggle\tAborting delayed toggle operation, another movement detected")
                 return
         log.info("toggle\tToggle operation called")
-        self.__motor.toggle()
-        if toggle_type == "start":
-            self.__door_sensor.door_started_while_stopped()
-        if toggle_type == "stop":
-            self.__door_sensor.door_stopped_while_moving()
+        self.__toggle_in_progress = True
+        await self.__motor.toggle()
+        self.__toggle_in_progress = False
 
-    def set_target(self, target):
+
+    async def set_target(self, target):
         target_str = Position.description[target]
         self_target_str = Position.description[self.__target]
         last_call_time = self.__last_call_time
+        self.__last_call_time = time.ticks_ms()
         elapsed_since_last_processed_call = time.ticks_diff(time.ticks_ms(), last_call_time)
 
         # Disregard requests whose target state is already being actioned, happen too soon after a prior request or
@@ -140,9 +141,6 @@ class DoorActuator(object):
         # Update door actuator with the target it is aiming for.
         self.__target = target
 
-        # Record the last time a call was considered for processing (used by debouncing logic above)
-        self.__last_call_time = time.ticks_ms()
-
         # Door already at target position
         if target == door_position and door_movement == Movement.STOPPED:
             log.info("set_target\t\tReceived request to set door target to %s but door is already %s. Ignoring request.",
@@ -154,7 +152,10 @@ class DoorActuator(object):
                      target_str, door_movement_str)
         # Door Stopped at opposite position and ready to go
         elif door_position * -1  == target and door_movement == Movement.STOPPED:
-            self.__motor.toggle()
+            log.info("set_target\t\tReceived request to set door target to %s. Door is currently %s, requesting %s of door",
+                     target_str, door_movement_str, door_next_movement_str)
+            log.info("Am in here")
+            await self.toggle(toggle_type="start")
         # WARNING: should think really carefully about 'clever' stuff that might involve start/stops to return that
         # may get door to desired target position during move.  Think about external factors and fallback. Above all
         # ensure does not result in endless cycling
@@ -163,23 +164,29 @@ class DoorActuator(object):
         elif door_movement == target * -1 and door_position == Position.PART_OPEN:
             log.info("set_target\t\tReceived request to set door target to %s, but door is currently %s. Calling __stop_and_return",
                      target_str, door_movement_str)
-            self.__corrective_movement_task = self.__loop.create_task(self.__stop_and_return())
+            await self.__stop_and_return()
         # Door stopped, part_open and set to go in right direction on next movement
         elif door_movement == Movement.STOPPED and door_position == Position.PART_OPEN and target == door_next_movement:
             log.info("set_target\t\tReceived request to set door target to %s. Door is currently %s, requesting %s of door",
                      target_str, door_movement_str, door_next_movement_str)
-            self.__motor.toggle()
+            await self.toggle(toggle_type="start")
         # Door stopped, part_open and set to go in wrong direction on next movement
         elif door_movement == Movement.STOPPED and door_position == Position.PART_OPEN and target == door_next_movement * -1:
             log.info("set_target\t\tReceived request to set door target to %s, but door is currently %s and next movement is set to be %s. Calling __start_stop_and_return",
                      target_str, door_movement_str, door_next_movement_str)
-            self.__corrective_movement_task = self.__loop.create_task(self.__start_stop_and_return())
+            await self.__start_stop_and_return()
         # Door stopped, part_open and next movement unknown
         elif door_movement == Movement.STOPPED and door_position == Position.PART_OPEN and door_next_movement == Movement.UNKNOWN:
             log.info(
                 "set_target\t\tReceived request to set door target to %s, door is currently %s, %s and next movement is %s.",
                 target_str, door_movement_str, door_position_str, door_next_movement_str)
-            self.__motor.toggle()
+            await self.toggle(toggle_type="start")
+        # Door movement Unknown, part_open and next movement unknown (happens when system is booted in a part_open state)
+        elif door_movement == Movement.UNKNOWN and door_position == Position.PART_OPEN and door_next_movement == Movement.UNKNOWN:
+            log.info(
+                "set_target\t\tReceived request to set door target to %s, door is currently %s, %s and next movement is %s.",
+                target_str, door_movement_str, door_position_str, door_next_movement_str)
+            await self.toggle(toggle_type="start")
         # Does this condition ever trigger? Error log if it does so we can work out what to do with it
         else:
             log.error(
@@ -189,29 +196,24 @@ class DoorActuator(object):
     async def __stop_and_return(self):
         self.__corrective_movement_status = CorrectiveMovement.IN_PROGRESS
         log.info("__stop_and_return\tStopping the door")
-        self.__motor.toggle()
-        self.__door_sensor.door_stopped_while_moving()
-        await asyncio.sleep(1)
+        await self.toggle(toggle_type="stop")
+        await asyncio.sleep_ms(DEBOUNCE_MS)
         log.info("__stop_and_return\t %s the door", Movement.description[self.__door_sensor.next_movement])
-        self.__motor.toggle()
-        self.__door_sensor.door_started_while_stopped()
-        await asyncio.sleep(1)
+        await self.toggle(toggle_type="start")
+        await asyncio.sleep_ms(DEBOUNCE_MS)
         self.__corrective_movement_status = CorrectiveMovement.COMPLETE
 
 
     async def __start_stop_and_return(self):
         self.__corrective_movement_status = CorrectiveMovement.IN_PROGRESS
         log.info("__start_stop_and_return\t%s the door", Movement.description[self.__door_sensor.next_movement])
-        self.__motor.toggle()
-        self.__door_sensor.door_started_while_stopped()
-        await asyncio.sleep(1)
+        await self.toggle(toggle_type="start")
+        await asyncio.sleep_ms(DEBOUNCE_MS)
         if self.__door_sensor.position == Position.PART_OPEN and self.__door_sensor.movement in [Movement.CLOSING, Movement.OPENING]: # This part made consitional as stop is not required if that start move in wrong direction gets there and stops of its own accord (eg it is really close to reachign wrong direction)
             log.info("__start_stop_and_return\tStopping the door")
-            self.__motor.toggle()
-            self.__door_sensor.door_stopped_while_moving()
-            await asyncio.sleep(1)
+            await self.toggle(toggle_type="stop")
+            await asyncio.sleep_ms(DEBOUNCE_MS)
         log.info("__start_stop_and_return\t%s the door", Movement.description[self.__door_sensor.next_movement])
-        self.__motor.toggle()
-        self.__door_sensor.door_started_while_stopped()
-        await asyncio.sleep(1)
+        await self.toggle(toggle_type="start")
+        await asyncio.sleep_ms(DEBOUNCE_MS)
         self.__corrective_movement_status = CorrectiveMovement.COMPLETE

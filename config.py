@@ -1,8 +1,8 @@
 from kooji.machine import Pin
 
 # Wireless Credentials
-ESSID = ***REMOVED***
-PASSWORD = ***REMOVED***
+ESSID = 'dd-wrt'
+PASSWORD = 'Nqu-3p6-kD7-LK4'
 
 # MQTT
 # SERVER = "mqttserver"
